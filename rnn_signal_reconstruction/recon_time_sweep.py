@@ -47,8 +47,9 @@ def build_dataset(O, F_list, P_list, T, S, sigma, split=(0.8, 0.2), seed=42):
 
 #### MODEL ####
 class RNNClassifierReconstructor(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_classes, nonlinearity='tanh'):
+    def __init__(self, input_dim, hidden_dim, num_classes, nonlinearity='tanh', seed=42):
         super().__init__()
+        torch.manual_seed(seed)
         self.rnn = nn.RNN(input_dim, hidden_dim, num_layers=1,
                           nonlinearity=nonlinearity, batch_first=True)
         self.class_head = nn.Linear(hidden_dim, num_classes)
@@ -126,6 +127,7 @@ def train_rnn_reconstruction_time(model, train_loader, test_loader,
 #### EXPERIMENT LOOP ####
 if __name__ == "__main__":
     # Settings
+    seed = 0
     O, T, S = 2, 500, 20
     sigma = 0.3
     F_list = [ [2,8,16],[2,6,12],[3,9,15],[1,5,14],[4,10,18] ]
@@ -134,7 +136,7 @@ if __name__ == "__main__":
         np.array([[7,2,2],[2,1,7]]), np.array([[3,4,2],[4,2,3]]),
         np.array([[2,2,6],[6,1,2]])
     ]
-    train_loader, test_loader = build_dataset(O, F_list, P_list, T, S, sigma)
+    train_loader, test_loader = build_dataset(O, F_list, P_list, T, S, sigma, seed=seed)
     input_dim, hidden_dim, num_classes = O, 128, 5
     # Experiment parameters
     reconstruction_times = np.linspace(-T//2, T//2, 21, dtype=int)  # 21 values from -250 to +250
@@ -144,7 +146,7 @@ if __name__ == "__main__":
     for reconstruction_time in reconstruction_times:
         print(f"Running for reconstruction_time = {reconstruction_time}")
         # Fresh model each time
-        model = RNNClassifierReconstructor(input_dim, hidden_dim, num_classes).to('cpu')
+        model = RNNClassifierReconstructor(input_dim, hidden_dim, num_classes, seed).to('cpu')
         acc_train, acc_test, loss_train, loss_test = train_rnn_reconstruction_time(
             model, train_loader, test_loader, epochs=10, 
             alpha=alpha, reconstruction_time=reconstruction_time, device='cpu')
@@ -172,3 +174,8 @@ if __name__ == "__main__":
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+    # Save metrics
+    np.savez(f"recon_sweep_{seed}seed.npz", train_acc=train_accs, test_acc=test_accs, train_loss=train_losses, test_loss=test_losses)
+
+    
